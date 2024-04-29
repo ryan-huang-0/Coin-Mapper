@@ -47,6 +47,9 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import java.util.Map;
+import java.lang.reflect.Type;
+import com.google.gson.reflect.TypeToken;
 
 
 
@@ -63,7 +66,13 @@ public class ApiApp extends Application {
     Scene scene;
     VBox root;
 
-    private ComboBox<String> countries;
+    /** Top Layer. */
+    public HBox selectLayer;
+    private List<String> countriesList;
+    private ComboBox<String> countryBox1;
+    private ComboBox<String> countryBox2;
+    private Button loadButton;
+    private Label toCurrency;
 
     /** HTTP client. */
     public static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
@@ -83,17 +92,38 @@ public class ApiApp extends Application {
      */
     public ApiApp() {
         root = new VBox();
-        countries = new ComboBox<String>();
+        selectLayer = new HBox(6);
+        countriesList = new ArrayList<>();
+
+        loadButton = new Button("Load");
+        toCurrency = new Label(" to ");
+
     } // ApiApp
 
     /** {@inheritDoc} */
     public void init() {
+
+        System.out.println("init() called");
+        try {
+            addCountries();
+        } catch (IOException e) {
+            System.err.println(e);
+        } // try
+        countryBox1 = new ComboBox<String>(FXCollections.observableArrayList(countriesList));
+        countryBox2 = new ComboBox<String>(FXCollections.observableArrayList(countriesList));
+
+        selectLayer.getChildren().addAll(countryBox1,toCurrency, countryBox2,loadButton);
+        selectLayer.setAlignment(Pos.CENTER);
+        selectLayer.setHgrow(countryBox1, Priority.ALWAYS);
+        selectLayer.setHgrow(countryBox2, Priority.ALWAYS);
+        selectLayer.setMaxWidth(1280);
 
     } // init
 
     /** {@inheritDoc} */
     @Override
     public void start(Stage stage) {
+
 
         this.stage = stage;
 
@@ -107,12 +137,13 @@ public class ApiApp extends Application {
         // Label notice = new Label("Modify the starter code to suit your needs.");
 
         // setup scene
-        root.getChildren().addAll(countries);
+        root.getChildren().addAll(selectLayer);
         scene = new Scene(root);
 
         // setup stage
         stage.setTitle("ApiApp!");
         stage.setScene(scene);
+        stage.setMaxWidth(1280);
         stage.setOnCloseRequest(event -> Platform.exit());
         stage.sizeToScene();
         stage.show();
@@ -179,4 +210,78 @@ public class ApiApp extends Application {
     } // requireStatusCode
 
 
+    // /**
+    //  * Creates an ArrayList containing all the countries available
+    //  * in the exchangerate API.
+    //  * @return a List containing all the countries within the currency list.
+    //  */
+    // private static CountryResponse fetchCountry() throws IOException {
+    //     try {
+    //         String url =
+    //             "https://raw.githubusercontent.com/fawazahmed0/exchange-api/main/country.json";
+    //         String json = ApiApp.fetchString(url);
+    //    CountryResponse countries = GSON.<CountryResponse>fromJson(json, CountryResponse.class);
+    //         return countries;
+    //     } catch (IOException e) {
+    //         throw e;
+    //     } // try
+
+
+    // } // getCountryList
+
+
+    /**
+     * Adds countries to country array list.
+     */
+    private void addCountries() throws IOException {
+        countriesList.clear();
+        try {
+            // CountryResponse countries = ApiApp.fetchCountry();
+
+            // for (Country c : countries.countryResults) {
+            //     String countryAndCurrency = c.countryName + " - " + c.currencyCode;
+            //     countriesList.add(countryAndCurrency);
+            // }
+            String url =
+                "https://raw.githubusercontent.com/fawazahmed0/exchange-api/main/country.json";
+            Type countryMapType = new TypeToken<Map<String, Country>>(){}.getType();
+            String json = ApiApp.fetchString(url);
+            Map<String, Country> countryMap = GSON.fromJson(json, countryMapType);
+
+            for (Country country : countryMap.values()) {
+                String countryAndCurrency = country.countryName + " - " + country.currencyCode;
+                countriesList.add(countryAndCurrency);
+            } // for
+
+        } catch (IOException e) {
+            throw e;
+        } // try
+
+
+    } // addCountries
+
+    //  /**
+    //  * Show a modal error alert based on {@code cause}.
+    //  * @param cause a {@link java.lang.Throwable Throwable} that caused the alert
+    //  */
+    // public void alertError(Throwable cause) {
+    //     // String url = GalleryApp.getItunesUrl(searchBox.getText()
+    //     //     , dropDown.getValue(), 200);
+    //     // TextArea text = new TextArea(url + "\n\n" + cause.toString());
+    //     text.setWrapText(true);
+    //     text.setEditable(false);
+    //     Alert alert = new Alert(AlertType.ERROR);
+    //     alert.getDialogPane().setContent(text);
+    //     alert.setResizable(true);
+    //     alert.showAndWait();
+    // } // alertError
+
+    // private static class ExchangeRatesResponse {
+    //     public Rates rates;
+
+    //     public static class Rates {
+    //         // This is a map of currency codes to exchange rates
+    //         public Map<String, Double> rates;
+    //     }
+    // }
 } // ApiApp
