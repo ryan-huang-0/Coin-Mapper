@@ -49,10 +49,13 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import java.util.Map;
 import java.lang.reflect.Type;
+import javafx.scene.text.Text;
+import javafx.animation.PauseTransition;
+import javafx.util.Duration;
+
 import com.google.gson.reflect.TypeToken;
-
-
-
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -67,12 +70,17 @@ public class ApiApp extends Application {
     VBox root;
 
     /** Top Layer. */
-    public HBox selectLayer;
+    private HBox selectLayer;
     private List<String> countriesList;
-    private ComboBox<String> countryBox1;
-    private ComboBox<String> countryBox2;
+    private static ComboBox<String> countryBox1;
+    private static ComboBox<String> countryBox2;
     private Button loadButton;
     private Label toCurrency;
+
+
+    /** Info Layer. */
+    private HBox infoLayer;
+    private Label exchange;
 
     /** HTTP client. */
     public static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
@@ -98,10 +106,15 @@ public class ApiApp extends Application {
         loadButton = new Button("Load");
         toCurrency = new Label(" to ");
 
+        infoLayer = new HBox(6);
+        exchange = new Label("Please select two currencies to compare.");
+
     } // ApiApp
 
     /** {@inheritDoc} */
     public void init() {
+        // exchange.setMinHeight(40);
+        exchange.setStyle("-fx-font-size: 15px;");
 
         System.out.println("init() called");
         try {
@@ -117,6 +130,11 @@ public class ApiApp extends Application {
         selectLayer.setHgrow(countryBox1, Priority.ALWAYS);
         selectLayer.setHgrow(countryBox2, Priority.ALWAYS);
         selectLayer.setMaxWidth(1280);
+
+        infoLayer.getChildren().addAll(exchange);
+
+
+        this.loadButton.setOnAction(event -> runNow(() -> this.loadButtonFunction()));
 
     } // init
 
@@ -137,7 +155,7 @@ public class ApiApp extends Application {
         // Label notice = new Label("Modify the starter code to suit your needs.");
 
         // setup scene
-        root.getChildren().addAll(selectLayer);
+        root.getChildren().addAll(selectLayer,infoLayer);
         scene = new Scene(root);
 
         // setup stage
@@ -260,21 +278,19 @@ public class ApiApp extends Application {
 
     } // addCountries
 
-    //  /**
-    //  * Show a modal error alert based on {@code cause}.
-    //  * @param cause a {@link java.lang.Throwable Throwable} that caused the alert
-    //  */
-    // public void alertError(Throwable cause) {
-    //     // String url = GalleryApp.getItunesUrl(searchBox.getText()
-    //     //     , dropDown.getValue(), 200);
-    //     // TextArea text = new TextArea(url + "\n\n" + cause.toString());
-    //     text.setWrapText(true);
-    //     text.setEditable(false);
-    //     Alert alert = new Alert(AlertType.ERROR);
-    //     alert.getDialogPane().setContent(text);
-    //     alert.setResizable(true);
-    //     alert.showAndWait();
-    // } // alertError
+     /**
+     * Show a modal error alert based on {@code cause}.
+     * @param cause a {@link java.lang.Throwable Throwable} that caused the alert
+     */
+    public void alertError(Throwable cause) {
+        TextArea text = new TextArea(cause.toString());
+        text.setWrapText(true);
+        text.setEditable(false);
+        Alert alert = new Alert(AlertType.ERROR);
+        alert.getDialogPane().setContent(text);
+        alert.setResizable(true);
+        alert.showAndWait();
+    } // alertError
 
     // private static class ExchangeRatesResponse {
     //     public Rates rates;
@@ -284,4 +300,93 @@ public class ApiApp extends Application {
     //         public Map<String, Double> rates;
     //     }
     // }
+
+    /**
+     * Return the URL string for a query to the Currency-exchange
+     * API.
+     * @param currencyCode The currency abbreviation for a country.
+     * @return The final URL to be used to search.
+     */
+    private static String getCurrencyUrl(String currencyCode) {
+        String url = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/";
+        url += currencyCode + ".json";
+        // System.out.println(url);
+        return url;
+    } // getCurrencyUrl
+
+    /**
+     * Gets the currency exchange rate from the first
+     * selection box to the second selection box.
+     * @return A string showing the exchange rate.
+     */
+    private static String compareCurrencies() throws Exception {
+        //String exchangeInfo = new String();
+
+
+        String baseCurrency = countryBox1.getValue();
+        String compareCurrency = countryBox2.getValue();
+        if (baseCurrency == null || compareCurrency == null) {
+            throw new Exception("Two currencies must be selected to make a comparison.");
+        } // if
+
+        String baseCode = baseCurrency.substring(baseCurrency.length() - 3);
+
+        String compareCode = compareCurrency.substring(compareCurrency.length() - 3);
+
+        String currencyUrl = ApiApp.getCurrencyUrl(baseCode);
+        String currencyJson = ApiApp.fetchString(currencyUrl);
+
+
+        JsonObject jsonObject = new Gson().fromJson(currencyJson, JsonObject.class);
+        JsonObject currencyObject = jsonObject.getAsJsonObject(baseCode);
+
+
+
+        double exchangeRate = currencyObject.get(compareCode).getAsDouble();
+
+        String exchangeInfo = "1 " + baseCode + " = " + exchangeRate + " " + compareCode
+            + ", Rate Updated daily.";
+
+        // return exchangeInfo;
+
+        return exchangeInfo;
+
+    } // compareCurrencies
+
+
+
+    /**
+     * Allows users to use the Load button to load
+     * the currency conversion and corresponding graphic.
+     */
+    public void loadButtonFunction() {
+
+
+        try {
+            this.loadButton.setDisable(true);
+            Platform.runLater(() -> {
+                try {
+                    this.exchange.setText(ApiApp.compareCurrencies());
+                } catch (Exception e) {
+                    alertError(e);
+                } //try
+            });
+
+            PauseTransition pause = new PauseTransition(Duration.seconds(2));
+            pause.setOnFinished(event -> loadButton.setDisable(false));
+            pause.play();
+
+
+
+        } catch (Exception e) {
+            // change this to alert later
+
+            Platform.runLater(() -> alertError(e));
+        }
+
+
+
+    } // loadButtonFunction
+
+
 } // ApiApp
