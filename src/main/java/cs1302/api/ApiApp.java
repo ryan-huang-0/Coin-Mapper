@@ -56,6 +56,7 @@ import javafx.util.Duration;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonArray;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -82,6 +83,18 @@ public class ApiApp extends Application {
     private HBox infoLayer;
     private Label exchange;
 
+    /** Map Layer. */
+    private HBox mapLayer;
+    private ImageView worldMap;
+    private static Map<String, Double> lonCache = new HashMap<>();
+    private static Map<String, Double> latCache = new HashMap<>();
+    private static Map<String, String> locationCache = new HashMap<>();
+
+
+    private String defaultFile = "https://img.freepik.com/free-photo"
+        + "/abstract-surface-textures-white-concrete-stone-wall_74190-8189.jpg";
+
+
     /** HTTP client. */
     public static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
         .version(HttpClient.Version.HTTP_2)           // uses HTTP protocol version 2 where possible
@@ -92,6 +105,8 @@ public class ApiApp extends Application {
     public static Gson GSON = new GsonBuilder()
         .setPrettyPrinting()                          // enable nice output when printing
         .create();                                    // builds and returns a Gson object
+
+    private static final String GEOAPIFYKEY = "d66530321e5c4294be3496040ea1f0be";
 
 
     /**
@@ -109,6 +124,8 @@ public class ApiApp extends Application {
         infoLayer = new HBox(6);
         exchange = new Label("Please select two currencies to compare.");
 
+        mapLayer = new HBox(6);
+
     } // ApiApp
 
     /** {@inheritDoc} */
@@ -125,6 +142,9 @@ public class ApiApp extends Application {
         countryBox1 = new ComboBox<String>(FXCollections.observableArrayList(countriesList));
         countryBox2 = new ComboBox<String>(FXCollections.observableArrayList(countriesList));
 
+        countryBox1.setMaxWidth(310);
+        countryBox2.setMaxWidth(310);
+
         selectLayer.getChildren().addAll(countryBox1,toCurrency, countryBox2,loadButton);
         selectLayer.setAlignment(Pos.CENTER);
         selectLayer.setHgrow(countryBox1, Priority.ALWAYS);
@@ -132,6 +152,12 @@ public class ApiApp extends Application {
         selectLayer.setMaxWidth(1280);
 
         infoLayer.getChildren().addAll(exchange);
+
+        Image defaultImage = new Image(defaultFile, 800, 600, false, false);
+        worldMap = new ImageView(defaultImage);
+
+        mapLayer.getChildren().addAll(worldMap);
+        mapLayer.setAlignment(Pos.CENTER);
 
 
         this.loadButton.setOnAction(event -> runNow(() -> this.loadButtonFunction()));
@@ -155,13 +181,17 @@ public class ApiApp extends Application {
         // Label notice = new Label("Modify the starter code to suit your needs.");
 
         // setup scene
-        root.getChildren().addAll(selectLayer,infoLayer);
+        root.getChildren().addAll(selectLayer,infoLayer,mapLayer);
         scene = new Scene(root);
+
 
         // setup stage
         stage.setTitle("ApiApp!");
         stage.setScene(scene);
         stage.setMaxWidth(1280);
+        stage.setMaxWidth(720);
+        // System.out.println("scene height: " + root.getHeight());
+        // System.out.println("scene width: " + root.getWidth());
         stage.setOnCloseRequest(event -> Platform.exit());
         stage.sizeToScene();
         stage.show();
@@ -353,6 +383,155 @@ public class ApiApp extends Application {
 
     } // compareCurrencies
 
+     /**
+     * Return the URL string for a query to the GeoApify geocoding
+     * API.
+     * @param countryName The name of the country
+     * @return The final URL to be used to search.
+     */
+    private static String getCountryLocJson(String countryName) throws IOException {
+
+        if (locationCache.containsKey(countryName)) {
+            return locationCache.get(countryName);
+        } // if
+
+        String url = "https://api.geoapify.com/v1/geocode/search";
+        url += String.format("?text=%s",  URLEncoder.encode(countryName.strip().toLowerCase()
+            , UTF_8));
+        url += "&format=json&apiKey=" + GEOAPIFYKEY;
+
+        String json = "";
+
+        try {
+            json = ApiApp.fetchString(url + "&type=country");
+            JsonObject jsonObject = new Gson().fromJson(json, JsonObject.class);
+            JsonArray resultArray = jsonObject.getAsJsonArray("results");
+
+            if (resultArray.size() == 0) {
+                // If no country found, try searching as a state
+                json = ApiApp.fetchString(url + "&type=state");
+            }
+            locationCache.put(countryName, json);
+        } catch (IOException e) {
+            throw e;
+        } // try
+
+
+        return json;
+    } // getCountryLocUrl
+
+    /**
+     * Return the longitude of a country in the provided Json.
+     * @param countryName The name of the country
+     * @return The longitude of the country provided.
+     */
+    private static double fetchLon(String countryName) throws Exception {
+        // String country1 = countryBox1.getValue();
+        // String country2 = countryBox2.getValue();
+        // if (country1 == null || country2 == null) {
+        //     throw new Exception("Two currencies must be selected to make a comparison.");
+        // } // ifString country1 = country
+
+        if (lonCache.containsKey(countryName)) {
+            return lonCache.get(countryName);
+        } // if
+        String countryJson = ApiApp.getCountryLocJson(countryName);
+
+        if (countryJson.isEmpty()) {
+            throw new Exception("Unable to fetch longitude for " + countryName);
+        } // if
+
+        JsonObject jsonObject = new Gson().fromJson(countryJson, JsonObject.class);
+        JsonArray resultArray = jsonObject.getAsJsonArray("results");
+
+
+        if (resultArray.size() > 0) {
+            JsonObject firstResult = resultArray.get(0).getAsJsonObject();
+            double countryLon = firstResult.get("lon").getAsDouble();
+            lonCache.put(countryName, countryLon);
+            return countryLon;
+
+        } // if
+
+
+
+        throw new Exception("No results found for " + countryName);
+
+
+
+    } // fetchLon
+
+
+    /**
+     * Return the latitude of a country in the provided Json.
+     * @param countryName The name of the country
+     * @return The latitude of the country.
+     */
+    private static double fetchLat(String countryName) throws Exception {
+        if (latCache.containsKey(countryName)) {
+            return latCache.get(countryName);
+        } // if
+
+        String countryJson = ApiApp.getCountryLocJson(countryName);
+
+        if (countryJson.isEmpty()) {
+            throw new Exception("Unable to fetch longitude for " + countryName);
+        } // if
+
+        JsonObject jsonObject  = new Gson().fromJson(countryJson, JsonObject.class);
+        JsonArray resultArray = jsonObject.getAsJsonArray("results");
+
+        if (resultArray.size() > 0) {
+            JsonObject firstResult = resultArray.get(0).getAsJsonObject();
+            double countryLat = firstResult.get("lat").getAsDouble();
+            latCache.put(countryName, countryLat);
+            return countryLat;
+        } // if
+
+        throw new Exception("No results found for " + countryName);
+
+    } // fetchLat
+
+
+    /**
+     * Creates map url and fetches the static map from the url.
+     * @return The static map image.
+     */
+    private static Image fetchMap() throws Exception {
+        try {
+            String country1String = countryBox1.getValue();
+            String country2String = countryBox2.getValue();
+
+            String country1Name = country1String.substring(0, country1String.length() - 6);
+            String country2Name = country2String.substring(0, country2String.length() - 6);
+
+            Double lon1 = ApiApp.fetchLon(country1Name);
+            Double lat1 = ApiApp.fetchLat(country1Name);
+
+            Double lon2 = ApiApp.fetchLon(country2Name);
+            Double lat2 = ApiApp.fetchLat(country2Name);
+
+            String markerDetails = ";color:%23ff0000;size:medium";
+
+            String url = "https://maps.geoapify.com/v1/staticmap?style=osm-carto&width=800"
+                + "&height=600&center=lonlat:4.5,0&zoom=0.809";
+
+            url += "&marker=lonlat:" + lon1 + "," + lat1 + markerDetails + "|lonlat:" + lon2 + "," +
+                lat2 + markerDetails + "&apiKey=" + GEOAPIFYKEY;
+
+            Image mapImage = new Image(url);
+
+            return mapImage;
+        } catch (Exception e) {
+            throw e;
+        } // try
+
+
+
+    } // fetchMap
+
+
+
 
 
     /**
@@ -364,17 +543,23 @@ public class ApiApp extends Application {
 
         try {
             this.loadButton.setDisable(true);
+            PauseTransition pause = new PauseTransition(Duration.seconds(2));
+            pause.setOnFinished(event -> loadButton.setDisable(false));
+            pause.play();
+
+
             Platform.runLater(() -> {
+
                 try {
                     this.exchange.setText(ApiApp.compareCurrencies());
+                    Image markerMap = ApiApp.fetchMap();
+                    worldMap.setImage(markerMap);
                 } catch (Exception e) {
                     alertError(e);
                 } //try
             });
 
-            PauseTransition pause = new PauseTransition(Duration.seconds(2));
-            pause.setOnFinished(event -> loadButton.setDisable(false));
-            pause.play();
+
 
 
 
