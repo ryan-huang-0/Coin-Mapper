@@ -41,6 +41,7 @@ https://api.currencybeacon.com/v1/convert?api_key=mVIzTknXa8E9jSC094StUnXG8J9STg
 ```
 
 > Used to get currency exchange rates.
+> 5000 API requests allowed on free plan.
 
 ### API 3
 
@@ -49,6 +50,7 @@ https://api.geoapify.com/v1/geocode/search?text=benin&format=json&apiKey=d665303
 https://maps.geoapify.com/v1/staticmap?style=osm-carto&width=800&height=600&center=lonlat:4.5,0&zoom=0.809&marker=lonlat:17.5691241,-11.8775768;color:%23ff0000;size:medium|lonlat:2.2584408,9.5293472;color:%23ff0000;size:medium&apiKey=d66530321e5c4294be3496040ea1f0be
 ```
 > Used to get geolocation and static map that displays the world map with markers indicating the two countries selected by the user.
+> 3000 API requests per month allowed on free plan.
 
 ## Part 2: New
 
