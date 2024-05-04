@@ -377,7 +377,7 @@ public class ApiApp extends Application {
     private static String getCurrencyUrl(String baseCode, String compareCode) {
         String url = "https://api.currencybeacon.com/v1/convert?api_key=";
         url += CURRENCYKEY + "&from=" + baseCode + "&to=" + compareCode + "&amount=1";
-        // System.out.println(url);
+        System.out.println(url);
         return url;
     } // getCurrencyUrl
 
@@ -437,6 +437,8 @@ public class ApiApp extends Application {
         url += String.format("?text=%s",  URLEncoder.encode(countryName.strip().toLowerCase()
             , UTF_8));
         url += "&format=json&apiKey=" + GEOAPIFYKEY;
+
+        System.out.println(url);
 
         String json = "";
 
@@ -551,6 +553,8 @@ public class ApiApp extends Application {
 
             url += "&marker=lonlat:" + lon1 + "," + lat1 + markerDetails + "|lonlat:" + lon2 + "," +
                 lat2 + markerDetails + "&apiKey=" + GEOAPIFYKEY;
+
+            System.out.println(url);
 
             Image mapImage = new Image(url);
 
