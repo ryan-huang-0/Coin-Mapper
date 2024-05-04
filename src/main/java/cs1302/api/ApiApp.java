@@ -52,13 +52,16 @@ import java.lang.reflect.Type;
 import javafx.scene.text.Text;
 import javafx.animation.PauseTransition;
 import javafx.util.Duration;
+import javafx.scene.layout.Pane;
+import javafx.scene.control.ProgressIndicator;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
 
-import com.google.gson.reflect.TypeToken;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.google.gson.JsonArray;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 
 /**
  * Allows users to select a country on a map and shows
@@ -82,6 +85,9 @@ public class ApiApp extends Application {
     /** Info Layer. */
     private HBox infoLayer;
     private Label exchange;
+    private Pane spacer;
+    private ProgressIndicator spinner;
+
 
     /** Map Layer. */
     private HBox mapLayer;
@@ -91,8 +97,7 @@ public class ApiApp extends Application {
     private static Map<String, String> locationCache = new HashMap<>();
 
 
-    private String defaultFile = "https://img.freepik.com/free-photo"
-        + "/abstract-surface-textures-white-concrete-stone-wall_74190-8189.jpg";
+    private String defaultFile = "file:resources/white-background.png";
 
 
     /** HTTP client. */
@@ -106,7 +111,11 @@ public class ApiApp extends Application {
         .setPrettyPrinting()                          // enable nice output when printing
         .create();                                    // builds and returns a Gson object
 
-    private static final String GEOAPIFYKEY = "d66530321e5c4294be3496040ea1f0be";
+    private static String GEOAPIFYKEY;
+
+    private static String CURRENCYKEY;
+
+
 
 
     /**
@@ -123,8 +132,11 @@ public class ApiApp extends Application {
 
         infoLayer = new HBox(6);
         exchange = new Label("Please select two currencies to compare.");
+        spacer = new Pane();
+        spinner = new ProgressIndicator();
 
         mapLayer = new HBox(6);
+        ApiApp.setKeys();
 
     } // ApiApp
 
@@ -151,7 +163,14 @@ public class ApiApp extends Application {
         selectLayer.setHgrow(countryBox2, Priority.ALWAYS);
         selectLayer.setMaxWidth(1280);
 
-        infoLayer.getChildren().addAll(exchange);
+        infoLayer.getChildren().addAll(exchange, spacer, spinner);
+        spinner.setVisible(false);
+        infoLayer.setHgrow(spacer, Priority.ALWAYS);
+        spacer.setMaxWidth(600);
+        infoLayer.setHgrow(spinner, Priority.ALWAYS);
+        infoLayer.setMaxHeight(32);
+
+
 
         Image defaultImage = new Image(defaultFile, 800, 600, false, false);
         worldMap = new ImageView(defaultImage);
@@ -204,6 +223,22 @@ public class ApiApp extends Application {
         // feel free to modify this method
         System.out.println("stop() called");
     } // stop
+
+    /**
+     * Sets API keys from config file.
+     */
+    private static void setKeys() {
+        try (FileInputStream configFileStream
+            = new FileInputStream("resources/config.properties")) {
+            Properties config = new Properties();
+            config.load(configFileStream);
+            GEOAPIFYKEY = config.getProperty("geoapify.key");
+            CURRENCYKEY = config.getProperty("currencybeacon.key");
+        } catch (IOException ioe) {
+            System.err.println(ioe);
+            ioe.printStackTrace();
+        }
+    } // static
 
     /**
      * Creates and immediately starts a new daemon thread that executes
@@ -297,7 +332,8 @@ public class ApiApp extends Application {
             Map<String, Country> countryMap = GSON.fromJson(json, countryMapType);
 
             for (Country country : countryMap.values()) {
-                String countryAndCurrency = country.countryName + " - " + country.currencyCode;
+                String countryAndCurrency = country.countryName + " - "
+                    + country.currencyCode.toUpperCase();
                 countriesList.add(countryAndCurrency);
             } // for
 
@@ -334,12 +370,13 @@ public class ApiApp extends Application {
     /**
      * Return the URL string for a query to the Currency-exchange
      * API.
-     * @param currencyCode The currency abbreviation for a country.
+     * @param baseCode The currency abbreviation for the base country.
+     * @param compareCode The currency abbreviation for the compare country.
      * @return The final URL to be used to search.
      */
-    private static String getCurrencyUrl(String currencyCode) {
-        String url = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/";
-        url += currencyCode + ".json";
+    private static String getCurrencyUrl(String baseCode, String compareCode) {
+        String url = "https://api.currencybeacon.com/v1/convert?api_key=";
+        url += CURRENCYKEY + "&from=" + baseCode + "&to=" + compareCode + "&amount=1";
         // System.out.println(url);
         return url;
     } // getCurrencyUrl
@@ -363,21 +400,22 @@ public class ApiApp extends Application {
 
         String compareCode = compareCurrency.substring(compareCurrency.length() - 3);
 
-        String currencyUrl = ApiApp.getCurrencyUrl(baseCode);
+        String currencyUrl = ApiApp.getCurrencyUrl(baseCode, compareCode);
         String currencyJson = ApiApp.fetchString(currencyUrl);
 
+        // CurrencyResponse currencyResponse = new Gson().fromJson(currencyJson
+        //     , CurrencyResponse.class);
 
-        JsonObject jsonObject = new Gson().fromJson(currencyJson, JsonObject.class);
-        JsonObject currencyObject = jsonObject.getAsJsonObject(baseCode);
+        // double exchangeRate = currencyResponse.rates.get(compareCode);
 
+        CurrencyResponse currencyResponse = GSON.fromJson(currencyJson, CurrencyResponse.class);
 
+        double exchangeRate = currencyResponse.response.value;
 
-        double exchangeRate = currencyObject.get(compareCode).getAsDouble();
 
         String exchangeInfo = "1 " + baseCode + " = " + exchangeRate + " " + compareCode
             + ", Rate Updated daily.";
 
-        // return exchangeInfo;
 
         return exchangeInfo;
 
@@ -404,10 +442,9 @@ public class ApiApp extends Application {
 
         try {
             json = ApiApp.fetchString(url + "&type=country");
-            JsonObject jsonObject = new Gson().fromJson(json, JsonObject.class);
-            JsonArray resultArray = jsonObject.getAsJsonArray("results");
+            GeoapifyResponse response = GSON.fromJson(json, GeoapifyResponse.class);
 
-            if (resultArray.size() == 0) {
+            if (response.results.size()  == 0) {
                 // If no country found, try searching as a state
                 json = ApiApp.fetchString(url + "&type=state");
             }
@@ -441,13 +478,11 @@ public class ApiApp extends Application {
             throw new Exception("Unable to fetch longitude for " + countryName);
         } // if
 
-        JsonObject jsonObject = new Gson().fromJson(countryJson, JsonObject.class);
-        JsonArray resultArray = jsonObject.getAsJsonArray("results");
+        GeoapifyResponse response = new Gson().fromJson(countryJson, GeoapifyResponse.class);
 
 
-        if (resultArray.size() > 0) {
-            JsonObject firstResult = resultArray.get(0).getAsJsonObject();
-            double countryLon = firstResult.get("lon").getAsDouble();
+        if (response.results.size() > 0) {
+            double countryLon = response.results.get(0).lon;
             lonCache.put(countryName, countryLon);
             return countryLon;
 
@@ -478,12 +513,10 @@ public class ApiApp extends Application {
             throw new Exception("Unable to fetch longitude for " + countryName);
         } // if
 
-        JsonObject jsonObject  = new Gson().fromJson(countryJson, JsonObject.class);
-        JsonArray resultArray = jsonObject.getAsJsonArray("results");
+        GeoapifyResponse response = new Gson().fromJson(countryJson, GeoapifyResponse.class);
 
-        if (resultArray.size() > 0) {
-            JsonObject firstResult = resultArray.get(0).getAsJsonObject();
-            double countryLat = firstResult.get("lat").getAsDouble();
+        if (response.results.size() > 0) {
+            double countryLat = response.results.get(0).lat;
             latCache.put(countryName, countryLat);
             return countryLat;
         } // if
@@ -542,22 +575,30 @@ public class ApiApp extends Application {
 
 
         try {
+
             this.loadButton.setDisable(true);
+            Platform.runLater(() -> spinner.setVisible(true));
+
             PauseTransition pause = new PauseTransition(Duration.seconds(2));
-            pause.setOnFinished(event -> loadButton.setDisable(false));
-            pause.play();
+            pause.setOnFinished(event -> {
 
 
-            Platform.runLater(() -> {
+                loadButton.setDisable(false);
+                Platform.runLater(() -> {
 
-                try {
-                    this.exchange.setText(ApiApp.compareCurrencies());
-                    Image markerMap = ApiApp.fetchMap();
-                    worldMap.setImage(markerMap);
-                } catch (Exception e) {
-                    alertError(e);
-                } //try
+                    try {
+                        this.exchange.setText(ApiApp.compareCurrencies());
+                        Image markerMap = ApiApp.fetchMap();
+                        worldMap.setImage(markerMap);
+                        spinner.setVisible(false);
+                    } catch (Exception e) {
+                        alertError(e);
+                    } //try
+                });
+
             });
+
+            pause.play();
 
 
 
@@ -566,7 +607,10 @@ public class ApiApp extends Application {
         } catch (Exception e) {
             // change this to alert later
 
-            Platform.runLater(() -> alertError(e));
+            Platform.runLater(() -> {
+                alertError(e);
+                spinner.setVisible(false);
+            });
         }
 
 
