@@ -1,9 +1,4 @@
-# Deadline
 
-Modify this file to satisfy a submission requirement related to the project
-deadline. Please keep this file organized using Markdown. If you click on
-this file in your GitHub repository website, then you will see that the
-Markdown is transformed into nice-looking HTML.
 
 ## Part 1.1: App Description
 
@@ -13,18 +8,10 @@ Markdown is transformed into nice-looking HTML.
 > This app then allows users to visualize their geographic relation from
 > a world map with markers provided by the Geoapify API.
 
-> https://github.com/ryan-huang-0/cs1302-api-app
 
 TODO WRITE / REPLACE
 
-## Part 1.2: APIs
-
-> For each RESTful JSON API that your app uses (at least two are required),
-> include an example URL for a typical request made by your app. If you
-> need to include additional notes (e.g., regarding API keys or rate
-> limits), then you can do that below the URL/URI. Placeholders for this
-> information are provided below. If your app uses more than two RESTful
-> JSON APIs, then include them with similar formatting.
+## APIs
 
 ### API 1
 
@@ -64,7 +51,7 @@ https://maps.geoapify.com/v1/staticmap?style=osm-carto&width=800&height=600&cent
 > valuable experience in building applications, I am
 > excited to continue doing so.
 
-TODO WRITE / REPLACE
+
 
 ## Part 3: Retrospect
 
@@ -80,4 +67,4 @@ TODO WRITE / REPLACE
 > would probably focus more on making the app more user-
 > friendly, also.
 
-TODO WRITE / REPLACE
+
